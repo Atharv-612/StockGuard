@@ -1,7 +1,5 @@
 package com.stockguard.service;
 
-import com.stockguard.dto.BatchDto;
-import com.stockguard.dto.ProductDto;
 import com.stockguard.entity.Product;
 import com.stockguard.entity.ProductBatch;
 import com.stockguard.entity.Shop;

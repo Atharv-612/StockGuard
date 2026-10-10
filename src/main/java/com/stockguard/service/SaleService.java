@@ -19,20 +19,17 @@ import java.util.stream.Collectors;
 public class SaleService {
 
     private final SaleRepository saleRepository;
-    private final SaleItemRepository saleItemRepository;
     private final ProductRepository productRepository;
     private final ProductBatchRepository batchRepository;
     private final StockMovementRepository stockMovementRepository;
     private final AuthService authService;
 
     public SaleService(SaleRepository saleRepository,
-                       SaleItemRepository saleItemRepository,
                        ProductRepository productRepository,
                        ProductBatchRepository batchRepository,
                        StockMovementRepository stockMovementRepository,
                        AuthService authService) {
         this.saleRepository = saleRepository;
-        this.saleItemRepository = saleItemRepository;
         this.productRepository = productRepository;
         this.batchRepository = batchRepository;
         this.stockMovementRepository = stockMovementRepository;

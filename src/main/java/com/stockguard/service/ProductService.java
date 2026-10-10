@@ -4,7 +4,6 @@ import com.stockguard.dto.ProductDto;
 import com.stockguard.entity.Category;
 import com.stockguard.entity.Product;
 import com.stockguard.entity.Shop;
-import com.stockguard.exception.BusinessException;
 import com.stockguard.exception.ResourceNotFoundException;
 import com.stockguard.repository.CategoryRepository;
 import com.stockguard.repository.ProductRepository;

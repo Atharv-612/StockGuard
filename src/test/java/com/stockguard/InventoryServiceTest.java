@@ -6,9 +6,7 @@ import com.stockguard.entity.User;
 import com.stockguard.exception.BusinessException;
 import com.stockguard.repository.ProductRepository;
 import com.stockguard.repository.ShopRepository;
-import com.stockguard.repository.StockMovementRepository;
 import com.stockguard.repository.UserRepository;
-import com.stockguard.service.AuthService;
 import com.stockguard.service.InventoryService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,9 +35,6 @@ class InventoryServiceTest {
 
     @Autowired
     private UserRepository userRepository;
-
-    @Autowired
-    private StockMovementRepository stockMovementRepository;
 
     private Shop shop;
     private Product product;
