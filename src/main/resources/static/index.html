@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StockGuard — Smart Inventory & Expiry Tracking System</title>
+  <meta name="description" content="StockGuard helps grocery, dairy, and convenience stores manage multi-batch inventory, prevent expiry losses, and automate WhatsApp alerts.">
+  
+  <!-- FontAwesome 6 & Google Fonts -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="css/variables.css">
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/landing.css">
+  <script>
+    (function() {
+      const t = localStorage.getItem('stockguard_theme') || localStorage.getItem('neo_theme');
+      if (t === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+    })();
+  </script>
+</head>
+<body>
+
+  <!-- Navigation -->
+  <nav class="landing-nav">
+    <a href="/" class="brand-logo">
+      <div class="brand-icon">
+        <i class="fa-solid fa-shield-halved"></i>
+      </div>
+      <span>StockGuard</span>
+    </a>
+
+    <ul class="nav-links">
+      <li><a href="#features">Features</a></li>
+      <li><a href="#workflow">How It Works</a></li>
+      <li><a href="#showcase">Grocery Categories</a></li>
+      <li><a href="#benefits">Business Impact</a></li>
+    </ul>
+
+    <div class="nav-actions">
+      <!-- Theme Toggle Button -->
+      <button id="landing-theme-toggle" class="theme-toggle-nav-btn" aria-label="Toggle Theme" title="Toggle Light / Black Theme">
+        <i class="fa-solid fa-moon"></i>
+        <span class="theme-toggle-label">Black</span>
+      </button>
+      <a href="/neobrutalism.html" class="btn btn-sm" style="background:#FFE600; color:#000; border:2px solid #000; box-shadow:3px 3px 0 #000; font-weight:800;">
+        <i class="fa-solid fa-bolt"></i> Neo-Brutalism Lab
+      </a>
+      <a href="/app.html?view=login" class="btn btn-outline" style="color:#fff; border-color:rgba(255,255,255,0.2);">Sign In</a>
+      <a href="/app.html?view=register" class="btn btn-primary">Start Free Trial</a>
+    </div>
+  </nav>
+
+  <!-- Hero Section -->
+  <header class="hero-section">
+    <div class="hero-container">
+      <div class="hero-text-content">
+        <div class="hero-tagline-badge">
+          <i class="fa-solid fa-sparkles"></i> Smart Retail Inventory 2.0
+        </div>
+        <h1 class="hero-headline">
+          Smart Inventory. <br>
+          <span class="gradient-text">Track Expiry.</span> <br>
+          Grow Your Business.
+        </h1>
+        <p class="hero-description">
+          The tailored inventory operating system designed specifically for small grocery shops, dairy stores, and convenience marts. Prevent stock waste, track multi-batch expiry dates, and receive instant WhatsApp alerts.
+        </p>
+
+        <div class="hero-actions">
+          <a href="/app.html?view=register" class="btn btn-primary btn-lg">
+            <i class="fa-solid fa-rocket"></i> Get Started Free
+          </a>
+          <a href="/app.html?view=login" class="btn btn-outline btn-lg" style="color:#fff; border-color:rgba(255,255,255,0.25);">
+            <i class="fa-solid fa-play"></i> Live Demo Store
+          </a>
+        </div>
+
+        <div class="hero-pill-strip">
+          <div class="pill-item">
+            <i class="fa-solid fa-circle-check"></i>
+            <span>0% Expired Stock Sold</span>
+          </div>
+          <div class="pill-item">
+            <i class="fa-brands fa-whatsapp"></i>
+            <span>Meta Cloud API Alerts</span>
+          </div>
+          <div class="pill-item">
+            <i class="fa-solid fa-bolt"></i>
+            <span>Rapid POS Billing</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3D Hero Visualization -->
+      <div class="hero-visual">
+        <div id="canvas-3d-hero"></div>
+
+        <div class="hero-card-floating floating-1">
+          <div class="floating-icon green">
+            <i class="fa-solid fa-shield-heart"></i>
+          </div>
+          <div class="floating-text">
+            <h4>Expiry Guard: Active</h4>
+            <p>16 Batches Monitored Today</p>
+          </div>
+        </div>
+
+        <div class="hero-card-floating floating-2">
+          <div class="floating-icon blue">
+            <i class="fa-brands fa-whatsapp"></i>
+          </div>
+          <div class="floating-text">
+            <h4>WhatsApp Alert Sent</h4>
+            <p>Milk Batch Expiring in 4 Days</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Features Section -->
+  <section class="features-section" id="features">
+    <div class="section-header">
+      <span class="section-badge">Core Capabilities</span>
+      <h2 class="section-title">Built for Real Shop Realities</h2>
+      <p class="section-subtitle">Everything a neighborhood grocery or dairy owner needs to eliminate stock shrinkage and speed up counter checkout.</p>
+    </div>
+
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon-box">
+          <i class="fa-solid fa-boxes-stacked"></i>
+        </div>
+        <h3>Multi-Batch Tracking</h3>
+        <p>Manage separate manufacturing dates, expiry dates, and unit costs for different batches of the exact same product SKU.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon-box">
+          <i class="fa-solid fa-clock-rotate-left"></i>
+        </div>
+        <h3>Configurable Expiry Radar</h3>
+        <p>Set warning thresholds (e.g., 7 days) and color-coded status badges: Safe, Expiring Soon, and Expired. Never sell expired stock.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon-box" style="color:#28D978;">
+          <i class="fa-brands fa-whatsapp"></i>
+        </div>
+        <h3>WhatsApp Business Cloud Alerts</h3>
+        <p>Receive automatic WhatsApp notifications directly to the owner's phone for low-stock thresholds, expiry warnings, and daily totals.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon-box">
+          <i class="fa-solid fa-cash-register"></i>
+        </div>
+        <h3>High-Speed POS Checkout</h3>
+        <p>Rapid counter billing with stock ceiling validation, instant FIFO inventory deductions, and thermal printable receipts.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon-box" style="color:#F59E0B;">
+          <i class="fa-solid fa-chart-pie"></i>
+        </div>
+        <h3>Sales & Wastage Analytics</h3>
+        <p>Interactive monthly sales charts, product revenue rankings, and financial audits calculating monetary losses from expired goods.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon-box">
+          <i class="fa-solid fa-lock"></i>
+        </div>
+        <h3>Complete Shop Isolation</h3>
+        <p>Spring Security stateless JWT authentication ensures that every store owner's inventory and revenue data is strictly isolated.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Workflow Section -->
+  <section class="workflow-section" id="workflow">
+    <div class="section-header">
+      <span class="section-badge">Streamlined Workflow</span>
+      <h2 class="section-title">How StockGuard Protects Your Store</h2>
+      <p class="section-subtitle">From receiving supplier crates to customer checkout, every unit is accounted for.</p>
+    </div>
+
+    <div class="workflow-steps">
+      <div class="step-card">
+        <div class="step-number">1</div>
+        <h4>Batch Intake</h4>
+        <p>Scan barcode or enter product details with batch number and expiry date upon delivery.</p>
+      </div>
+
+      <div class="step-card">
+        <div class="step-number">2</div>
+        <h4>Continuous Radar</h4>
+        <p>StockGuard continuously calculates days until expiry against current calendar dates.</p>
+      </div>
+
+      <div class="step-card">
+        <div class="step-number">3</div>
+        <h4>WhatsApp Alert</h4>
+        <p>Automated WhatsApp alerts prompt the owner to discount nearing items or return them to distributors.</p>
+      </div>
+
+      <div class="step-card">
+        <div class="step-number">4</div>
+        <h4>POS Deduction</h4>
+        <p>Front-desk sales automatically deduct earliest batches via FIFO, logging transparent movements.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Grocery Showcase -->
+  <section class="showcase-section" id="showcase">
+    <div class="section-header">
+      <span class="section-badge">Ready for Daily Essentials</span>
+      <h2 class="section-title">Pre-Seeded with Grocery Essentials</h2>
+      <p class="section-subtitle">StockGuard comes preloaded with realistic test items spanning daily grocery categories.</p>
+    </div>
+
+    <div class="showcase-grid">
+      <div class="showcase-card">
+        <div class="showcase-img"><i class="fa-solid fa-cow"></i></div>
+        <div class="showcase-details">
+          <h5>Dairy & Eggs</h5>
+          <p>Milk, Curd, Butter, Cheese, Eggs</p>
+        </div>
+      </div>
+
+      <div class="showcase-card">
+        <div class="showcase-img"><i class="fa-solid fa-bread-slice"></i></div>
+        <div class="showcase-details">
+          <h5>Bakery & Bread</h5>
+          <p>White Bread, Brown Bread, Buns</p>
+        </div>
+      </div>
+
+      <div class="showcase-card">
+        <div class="showcase-img"><i class="fa-solid fa-wheat-awn"></i></div>
+        <div class="showcase-details">
+          <h5>Grains & Staples</h5>
+          <p>Basmati Rice, Wheat Flour, Sugar</p>
+        </div>
+      </div>
+
+      <div class="showcase-card">
+        <div class="showcase-img"><i class="fa-solid fa-mug-hot"></i></div>
+        <div class="showcase-details">
+          <h5>Beverages</h5>
+          <p>Tea Leaves, Coffee Jars, Cold Drinks</p>
+        </div>
+      </div>
+
+      <div class="showcase-card">
+        <div class="showcase-img"><i class="fa-solid fa-cookie"></i></div>
+        <div class="showcase-details">
+          <h5>Packaged Snacks</h5>
+          <p>Glucose Biscuits, Potato Chips</p>
+        </div>
+      </div>
+
+      <div class="showcase-card">
+        <div class="showcase-img"><i class="fa-solid fa-bottle-droplet"></i></div>
+        <div class="showcase-details">
+          <h5>Cooking Oils</h5>
+          <p>Sunflower Oil, Mustard Oil, Ghee</p>
+        </div>
+      </div>
+
+      <div class="showcase-card">
+        <div class="showcase-img"><i class="fa-solid fa-pump-soap"></i></div>
+        <div class="showcase-details">
+          <h5>Cleaning & Hygiene</h5>
+          <p>Detergent Powder, Dishwash Soaps</p>
+        </div>
+      </div>
+
+      <div class="showcase-card">
+        <div class="showcase-img"><i class="fa-solid fa-barcode"></i></div>
+        <div class="showcase-details">
+          <h5>Custom SKUs</h5>
+          <p>Add Any General Store Merchandise</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA Banner -->
+  <section class="cta-banner" id="benefits">
+    <h2>Ready to Guard Your Shop's Inventory?</h2>
+    <p>Join smart retailers who stopped throwing money in the dumpster and started tracking every batch effortlessly.</p>
+    <a href="/app.html?view=register" class="btn btn-success btn-lg">
+      <i class="fa-solid fa-store"></i> Register Your Shop Now
+    </a>
+  </section>
+
+  <!-- Footer -->
+  <footer class="landing-footer">
+    <div style="max-width:1200px; margin:0 auto; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
+      <div style="display:flex; align-items:center; gap:0.5rem; color:#fff; font-weight:700;">
+        <i class="fa-solid fa-shield-halved" style="color:#1677FF;"></i> StockGuard Retail OS
+      </div>
+      <div>
+        Smart Inventory | Track Expiry | Grow Your Business
+      </div>
+      <div>
+        &copy; 2026 StockGuard Inc. Powered by Java Spring Boot &amp; MySQL.
+      </div>
+    </div>
+  </footer>
+
+  <!-- Three.js CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="js/landing3d.js"></script>
+  <script src="js/theme.js"></script>
+</body>
+</html>

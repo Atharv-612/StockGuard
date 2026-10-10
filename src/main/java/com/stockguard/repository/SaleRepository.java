@@ -1,0 +1,28 @@
+package com.stockguard.repository;
+
+import com.stockguard.entity.Sale;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+
+@Repository
+public interface SaleRepository extends JpaRepository<Sale, Long> {
+
+    List<Sale> findByShopIdOrderBySaleDateDesc(Long shopId);
+
+    Optional<Sale> findByIdAndShopId(Long id, Long shopId);
+
+    List<Sale> findByShopIdAndSaleDateBetweenOrderBySaleDateDesc(Long shopId, LocalDateTime start, LocalDateTime end);
+
+    @Query("SELECT COALESCE(SUM(s.totalAmount), 0) FROM Sale s WHERE s.shop.id = :shopId AND s.saleDate >= :start AND s.saleDate <= :end")
+    BigDecimal sumTotalSalesBetween(@Param("shopId") Long shopId, @Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    @Query("SELECT COALESCE(COUNT(s), 0) FROM Sale s WHERE s.shop.id = :shopId AND s.saleDate >= :start AND s.saleDate <= :end")
+    long countSalesBetween(@Param("shopId") Long shopId, @Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+}

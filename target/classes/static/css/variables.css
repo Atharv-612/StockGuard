@@ -1,0 +1,81 @@
+/* StockGuard Design System Tokens */
+:root {
+  /* Brand Palette */
+  --color-navy: #0B1530;
+  --color-navy-light: #15244E;
+  --color-navy-dark: #060B1A;
+  --color-primary: #1677FF;
+  --color-primary-hover: #0E5ED6;
+  --color-primary-subtle: rgba(22, 119, 255, 0.1);
+  --color-emerald: #28D978;
+  --color-emerald-dark: #1EAE5E;
+  --color-emerald-subtle: rgba(40, 217, 120, 0.12);
+  --color-amber: #F59E0B;
+  --color-amber-subtle: rgba(245, 158, 11, 0.12);
+  --color-crimson: #EF4444;
+  --color-crimson-subtle: rgba(239, 68, 68, 0.12);
+
+  /* Backgrounds & Surfaces */
+  --bg-body: #F4F7FC;
+  --bg-card: #FFFFFF;
+  --bg-card-glass: rgba(255, 255, 255, 0.85);
+  --bg-sidebar: #0B1530;
+  --bg-sidebar-hover: rgba(255, 255, 255, 0.08);
+  --bg-sidebar-active: #1677FF;
+
+  /* Typography Colors */
+  --text-main: #0F172A;
+  --text-muted: #64748B;
+  --text-light: #94A3B8;
+  --text-white: #FFFFFF;
+
+  /* Borders & Shadows */
+  --border-subtle: #E2E8F0;
+  --border-focus: #1677FF;
+  --shadow-sm: 0 1px 3px rgba(11, 21, 48, 0.06);
+  --shadow-md: 0 4px 12px rgba(11, 21, 48, 0.08);
+  --shadow-lg: 0 12px 28px rgba(11, 21, 48, 0.12);
+  --shadow-card: 0 6px 20px -4px rgba(11, 21, 48, 0.07);
+
+  /* Layout & Radii */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-full: 9999px;
+
+  /* Fonts */
+  --font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.25s ease;
+}
+
+/* Black / Dark Theme Tokens */
+[data-theme="dark"] {
+  --color-navy: #FFFFFF;
+  --color-navy-light: #2D3748;
+  --color-navy-dark: #000000;
+
+  /* Backgrounds & Surfaces (Pitch Black / Sleek Charcoal) */
+  --bg-body: #070B14;
+  --bg-card: #0F172A;
+  --bg-card-glass: rgba(15, 23, 42, 0.92);
+  --bg-sidebar: #050811;
+  --bg-sidebar-hover: rgba(255, 255, 255, 0.08);
+  --bg-sidebar-active: #1677FF;
+
+  /* Typography */
+  --text-main: #F8FAFC;
+  --text-muted: #94A3B8;
+  --text-light: #64748B;
+  --text-white: #FFFFFF;
+
+  /* Borders & Shadows */
+  --border-subtle: #1E293B;
+  --border-focus: #1677FF;
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.6);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.7);
+  --shadow-lg: 0 12px 28px rgba(0, 0, 0, 0.85);
+  --shadow-card: 0 6px 20px -4px rgba(0, 0, 0, 0.75);
+}
+
