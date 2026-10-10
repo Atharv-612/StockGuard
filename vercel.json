@@ -1,0 +1,15 @@
+{
+  "version": 2,
+  "outputDirectory": "src/main/resources/static",
+  "cleanUrls": true,
+  "rewrites": [
+    {
+      "source": "/app",
+      "destination": "/app.html"
+    },
+    {
+      "source": "/index",
+      "destination": "/index.html"
+    }
+  ]
+}

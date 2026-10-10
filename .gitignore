@@ -15,5 +15,6 @@ target/
 
 ### Environment & Database ###
 .env
+*.mv.db
 *.lock.db
 *.trace.db
