@@ -62,122 +62,141 @@ const Dashboard = {
   },
 
   async loadCharts() {
-    const monthlyData = await API.get('/reports/monthly-sales');
+    try {
+      let monthlyData = await API.get('/reports/monthly-sales');
 
-    // Monthly Sales Chart (Bar + Line)
-    const ctx = document.getElementById('monthlySalesChart');
-    if (ctx && typeof Chart !== 'undefined') {
-      if (this.salesChartInstance) {
-        this.salesChartInstance.destroy();
+      // Ensure monthlyData is an Array to prevent any .map errors
+      if (!Array.isArray(monthlyData)) {
+        if (monthlyData && Array.isArray(monthlyData.months)) {
+          monthlyData = monthlyData.months.map((m, i) => ({
+            label: m,
+            revenue: (monthlyData.sales && monthlyData.sales[i]) || 0,
+            orderCount: (monthlyData.orderCounts && monthlyData.orderCounts[i]) || 0,
+          }));
+        } else {
+          monthlyData = [];
+        }
       }
 
-      const labels = monthlyData.map(d => d.label);
-      const revenues = monthlyData.map(d => d.revenue);
-      const orders = monthlyData.map(d => d.orderCount);
+      // Monthly Sales Chart (Bar + Line)
+      const ctx = document.getElementById('monthlySalesChart');
+      if (ctx && typeof Chart !== 'undefined') {
+        if (this.salesChartInstance) {
+          this.salesChartInstance.destroy();
+        }
 
-      this.salesChartInstance = new Chart(ctx, {
-        type: 'bar',
-        data: {
-          labels: labels,
-          datasets: [
-            {
-              type: 'line',
-              label: 'Orders Count',
-              data: orders,
-              borderColor: '#28D978',
-              backgroundColor: 'rgba(40, 217, 120, 0.2)',
-              borderWidth: 3,
-              tension: 0.35,
-              yAxisID: 'y1',
-              pointRadius: 4,
-            },
-            {
-              type: 'bar',
-              label: 'Revenue (₹)',
-              data: revenues,
-              backgroundColor: 'rgba(22, 119, 255, 0.85)',
-              borderRadius: 6,
-              yAxisID: 'y',
-            },
-          ],
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: {
-              position: 'top',
-              labels: { font: { family: 'Plus Jakarta Sans', weight: '600' } },
-            },
-            tooltip: {
-              backgroundColor: '#0B1530',
-              padding: 12,
-              cornerRadius: 8,
-            },
-          },
-          scales: {
-            y: {
-              beginAtZero: true,
-              grid: { color: '#F1F5F9' },
-              ticks: { callback: (val) => '₹' + val },
-            },
-            y1: {
-              position: 'right',
-              beginAtZero: true,
-              grid: { display: false },
-              ticks: { precision: 0 },
-            },
-            x: {
-              grid: { display: false },
-            },
-          },
-        },
-      });
-    }
+        const labels = monthlyData.map(d => d.label || '');
+        const revenues = monthlyData.map(d => Number(d.revenue || 0));
+        const orders = monthlyData.map(d => Number(d.orderCount || 0));
 
-    // Category Distribution Donut Chart
-    const donutCtx = document.getElementById('categoryDonutChart');
-    if (donutCtx && typeof Chart !== 'undefined') {
-      if (this.categoryChartInstance) {
-        this.categoryChartInstance.destroy();
-      }
-
-      // Fetch categories & products to compute counts
-      const products = await API.get('/products');
-      const catCountMap = {};
-      products.forEach(p => {
-        const cat = p.categoryName || 'Uncategorized';
-        catCountMap[cat] = (catCountMap[cat] || 0) + (p.currentStock || 0);
-      });
-
-      const catLabels = Object.keys(catCountMap);
-      const catValues = Object.values(catCountMap);
-
-      this.categoryChartInstance = new Chart(donutCtx, {
-        type: 'doughnut',
-        data: {
-          labels: catLabels.length ? catLabels : ['Stock'],
-          datasets: [{
-            data: catValues.length ? catValues : [1],
-            backgroundColor: [
-              '#1677FF', '#28D978', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4'
+        this.salesChartInstance = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: labels,
+            datasets: [
+              {
+                type: 'line',
+                label: 'Orders Count',
+                data: orders,
+                borderColor: '#28D978',
+                backgroundColor: 'rgba(40, 217, 120, 0.2)',
+                borderWidth: 3,
+                tension: 0.35,
+                yAxisID: 'y1',
+                pointRadius: 4,
+              },
+              {
+                type: 'bar',
+                label: 'Revenue (₹)',
+                data: revenues,
+                backgroundColor: 'rgba(22, 119, 255, 0.85)',
+                borderRadius: 6,
+                yAxisID: 'y',
+              },
             ],
-            borderWidth: 2,
-            borderColor: '#fff',
-          }],
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: {
-              position: 'bottom',
-              labels: { boxWidth: 12, font: { family: 'Plus Jakarta Sans', size: 11 } },
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                position: 'top',
+                labels: { font: { family: 'Plus Jakarta Sans', weight: '600' } },
+              },
+              tooltip: {
+                backgroundColor: '#0B1530',
+                padding: 12,
+                cornerRadius: 8,
+              },
+            },
+            scales: {
+              y: {
+                beginAtZero: true,
+                grid: { color: '#F1F5F9' },
+                ticks: { callback: (val) => '₹' + val },
+              },
+              y1: {
+                position: 'right',
+                beginAtZero: true,
+                grid: { display: false },
+                ticks: { precision: 0 },
+              },
+              x: {
+                grid: { display: false },
+              },
             },
           },
-          cutout: '70%',
-        },
-      });
+        });
+      }
+
+      // Category Distribution Donut Chart
+      const donutCtx = document.getElementById('categoryDonutChart');
+      if (donutCtx && typeof Chart !== 'undefined') {
+        if (this.categoryChartInstance) {
+          this.categoryChartInstance.destroy();
+        }
+
+        // Fetch categories & products to compute counts
+        const products = (await API.get('/products')) || [];
+        const catCountMap = {};
+        if (Array.isArray(products)) {
+          products.forEach(p => {
+            const cat = p.categoryName || 'Uncategorized';
+            catCountMap[cat] = (catCountMap[cat] || 0) + (p.currentStock || 0);
+          });
+        }
+
+        const catLabels = Object.keys(catCountMap);
+        const catValues = Object.values(catCountMap);
+
+        this.categoryChartInstance = new Chart(donutCtx, {
+          type: 'doughnut',
+          data: {
+            labels: catLabels.length ? catLabels : ['Stock'],
+            datasets: [{
+              data: catValues.length ? catValues : [1],
+              backgroundColor: [
+                '#1677FF', '#28D978', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4'
+              ],
+              borderWidth: 2,
+              borderColor: '#fff',
+            }],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                position: 'bottom',
+                labels: { boxWidth: 12, font: { family: 'Plus Jakarta Sans', size: 11 } },
+              },
+            },
+            cutout: '70%',
+          },
+        });
+      }
+    } catch (err) {
+      console.warn('Dashboard charts could not be loaded:', err);
     }
   },
 

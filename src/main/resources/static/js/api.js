@@ -125,20 +125,113 @@ const API = {
 /**
  * In-Browser Cloud Demo Simulator Database
  * Allows StockGuard to run 100% interactively on Vercel, Netlify, GitHub Pages, etc.
+ * Fully compatible with backend DTOs and handles real-time data persistence.
  */
 const StockGuardMockDB = {
+  DB_KEY: 'stockguard_mock_db_v2',
+
   getDB() {
-    let raw = localStorage.getItem('stockguard_mock_db_v1');
+    let raw = localStorage.getItem(this.DB_KEY);
+    let db;
     if (!raw) {
-      const initial = this.seedInitial();
-      localStorage.setItem('stockguard_mock_db_v1', JSON.stringify(initial));
-      return initial;
+      // Check if older version exists to migrate or seed fresh
+      const oldRaw = localStorage.getItem('stockguard_mock_db_v1');
+      if (oldRaw) {
+        try {
+          db = JSON.parse(oldRaw);
+        } catch (e) {
+          db = null;
+        }
+      }
+      if (!db) {
+        db = this.seedInitial();
+      }
+    } else {
+      try {
+        db = JSON.parse(raw);
+      } catch (e) {
+        db = this.seedInitial();
+      }
     }
-    return JSON.parse(raw);
+
+    // Self-healing / normalization pass to ensure all fields strictly conform to DTO contracts
+    db = this.normalizeDB(db);
+    this.saveDB(db);
+    return db;
   },
 
   saveDB(db) {
-    localStorage.setItem('stockguard_mock_db_v1', JSON.stringify(db));
+    try {
+      localStorage.setItem(this.DB_KEY, JSON.stringify(db));
+    } catch (e) {
+      console.warn('LocalStorage save failed:', e);
+    }
+  },
+
+  normalizeDB(db) {
+    if (!db) return this.seedInitial();
+
+    if (!Array.isArray(db.categories)) db.categories = [];
+    if (!Array.isArray(db.products)) db.products = [];
+    if (!Array.isArray(db.batches)) db.batches = [];
+    if (!Array.isArray(db.movements)) db.movements = [];
+    if (!Array.isArray(db.sales)) db.sales = [];
+    if (!db.shop) db.shop = { id: 1, name: 'StockGuard Demo Grocery & Dairy', currency: 'INR', minStockDefault: 10, expiryWarningDays: 7 };
+
+    const today = new Date();
+
+    // Normalize Batches
+    db.batches.forEach(b => {
+      if (b.currentQuantity === undefined) {
+        b.currentQuantity = b.remainingQuantity !== undefined ? b.remainingQuantity : (b.initialQuantity || 0);
+      }
+      if (b.costPrice === undefined) {
+        b.costPrice = b.purchaseCost !== undefined ? b.purchaseCost : 0;
+      }
+      if (b.sellingPrice === undefined) {
+        const prod = db.products.find(p => p.id === b.productId);
+        b.sellingPrice = prod ? prod.sellingPrice : 0;
+      }
+      if (b.expiryDate) {
+        b.daysUntilExpiry = Math.ceil((new Date(b.expiryDate) - today) / (1000 * 60 * 60 * 24));
+        b.expiryState = b.daysUntilExpiry <= 0 ? 'EXPIRED' : (b.daysUntilExpiry <= 7 ? 'EXPIRING_SOON' : 'SAFE');
+      } else {
+        b.daysUntilExpiry = 30;
+        b.expiryState = 'SAFE';
+      }
+      if (!b.categoryName) {
+        const prod = db.products.find(p => p.id === b.productId);
+        b.categoryName = prod ? prod.categoryName : 'General';
+      }
+      if (!b.status) {
+        b.status = b.daysUntilExpiry <= 0 ? 'EXPIRED' : 'ACTIVE';
+      }
+    });
+
+    // Normalize Products
+    db.products.forEach(p => {
+      if (p.currentStock === undefined) p.currentStock = 0;
+      if (p.minStockThreshold === undefined) p.minStockThreshold = 10;
+      p.isLowStock = p.currentStock <= p.minStockThreshold;
+      p.activeBatchesCount = db.batches.filter(b => b.productId === p.id && b.currentQuantity > 0).length;
+    });
+
+    // Normalize Sales
+    db.sales.forEach(s => {
+      s.saleDate = s.saleDate || s.createdAt || new Date().toISOString();
+      s.subtotal = s.subtotal !== undefined ? s.subtotal : (s.totalAmount || 0);
+      s.discount = s.discount !== undefined ? s.discount : (s.discountAmount || 0);
+      s.tax = s.tax || 0;
+      s.totalAmount = s.totalAmount !== undefined ? s.totalAmount : (s.finalAmount || (s.subtotal - s.discount));
+      if (!Array.isArray(s.items)) s.items = [];
+      s.items.forEach(it => {
+        if (it.totalPrice === undefined) {
+          it.totalPrice = (it.quantity || 1) * (it.unitPrice || 0);
+        }
+      });
+    });
+
+    return db;
   },
 
   seedInitial() {
@@ -189,21 +282,37 @@ const StockGuardMockDB = {
         { id: 16, categoryId: 6, categoryName: 'Cooking Oils', name: 'Fortune Sunlite Refined Sunflower Oil 1L', sku: 'OIL-001', barcode: '890600728001', costPrice: 125.00, sellingPrice: 148.00, currentStock: 2, minStockThreshold: 10, unit: 'pouch', isLowStock: true, activeBatchesCount: 1 },
       ],
       batches: [
-        { id: 1, productId: 1, productName: 'Amul Taaza Homogenised Toned Milk 1L', batchNumber: 'BATCH-MLK-01', initialQuantity: 30, remainingQuantity: 24, purchaseCost: 54.00, sellingPrice: 60.00, mfgDate: addDays(today, -5), expiryDate: addDays(today, 4), daysUntilExpiry: 4, status: 'EXPIRING_SOON' },
-        { id: 2, productId: 1, productName: 'Amul Taaza Homogenised Toned Milk 1L', batchNumber: 'BATCH-MLK-02', initialQuantity: 40, remainingQuantity: 40, purchaseCost: 54.00, sellingPrice: 60.00, mfgDate: addDays(today, -1), expiryDate: addDays(today, 10), daysUntilExpiry: 10, status: 'SAFE' },
-        { id: 3, productId: 2, productName: 'Nestle A+ Nourish Dahi / Curd 400g', batchNumber: 'BATCH-CRD-01', initialQuantity: 15, remainingQuantity: 6, purchaseCost: 35.00, sellingPrice: 42.00, mfgDate: addDays(today, -12), expiryDate: addDays(today, -2), daysUntilExpiry: -2, status: 'EXPIRED' },
-        { id: 4, productId: 2, productName: 'Nestle A+ Nourish Dahi / Curd 400g', batchNumber: 'BATCH-CRD-02', initialQuantity: 20, remainingQuantity: 18, purchaseCost: 35.00, sellingPrice: 42.00, mfgDate: addDays(today, -2), expiryDate: addDays(today, 5), daysUntilExpiry: 5, status: 'EXPIRING_SOON' },
-        { id: 5, productId: 3, productName: 'Amul Pasteurized Butter 500g', batchNumber: 'BATCH-BTR-01', initialQuantity: 20, remainingQuantity: 16, purchaseCost: 245.00, sellingPrice: 275.00, mfgDate: addDays(today, -20), expiryDate: addDays(today, 90), daysUntilExpiry: 90, status: 'SAFE' },
-        { id: 6, productId: 4, productName: 'Britannia Processed Cheese Slices 200g', batchNumber: 'BATCH-CHS-01', initialQuantity: 15, remainingQuantity: 12, purchaseCost: 130.00, sellingPrice: 150.00, mfgDate: addDays(today, -30), expiryDate: addDays(today, 60), daysUntilExpiry: 60, status: 'SAFE' },
-        { id: 7, productId: 5, productName: 'Harvest Gold White Bread 400g', batchNumber: 'BATCH-BRD-01', initialQuantity: 20, remainingQuantity: 8, purchaseCost: 32.00, sellingPrice: 40.00, mfgDate: addDays(today, -4), expiryDate: addDays(today, 1), daysUntilExpiry: 1, status: 'EXPIRING_SOON' },
-        { id: 8, productId: 5, productName: 'Harvest Gold White Bread 400g', batchNumber: 'BATCH-BRD-02', initialQuantity: 25, remainingQuantity: 25, purchaseCost: 32.00, sellingPrice: 40.00, mfgDate: addDays(today, -1), expiryDate: addDays(today, 4), daysUntilExpiry: 4, status: 'EXPIRING_SOON' },
+        { id: 1, productId: 1, productName: 'Amul Taaza Homogenised Toned Milk 1L', categoryName: 'Dairy & Eggs', batchNumber: 'BATCH-MLK-01', initialQuantity: 30, currentQuantity: 24, costPrice: 54.00, sellingPrice: 60.00, mfgDate: addDays(today, -5), expiryDate: addDays(today, 4), daysUntilExpiry: 4, expiryState: 'EXPIRING_SOON', status: 'ACTIVE' },
+        { id: 2, productId: 1, productName: 'Amul Taaza Homogenised Toned Milk 1L', categoryName: 'Dairy & Eggs', batchNumber: 'BATCH-MLK-02', initialQuantity: 40, currentQuantity: 40, costPrice: 54.00, sellingPrice: 60.00, mfgDate: addDays(today, -1), expiryDate: addDays(today, 10), daysUntilExpiry: 10, expiryState: 'SAFE', status: 'ACTIVE' },
+        { id: 3, productId: 2, productName: 'Nestle A+ Nourish Dahi / Curd 400g', categoryName: 'Dairy & Eggs', batchNumber: 'BATCH-CRD-01', initialQuantity: 15, currentQuantity: 6, costPrice: 35.00, sellingPrice: 42.00, mfgDate: addDays(today, -12), expiryDate: addDays(today, -2), daysUntilExpiry: -2, expiryState: 'EXPIRED', status: 'EXPIRED' },
+        { id: 4, productId: 2, productName: 'Nestle A+ Nourish Dahi / Curd 400g', categoryName: 'Dairy & Eggs', batchNumber: 'BATCH-CRD-02', initialQuantity: 20, currentQuantity: 18, costPrice: 35.00, sellingPrice: 42.00, mfgDate: addDays(today, -2), expiryDate: addDays(today, 5), daysUntilExpiry: 5, expiryState: 'EXPIRING_SOON', status: 'ACTIVE' },
+        { id: 5, productId: 3, productName: 'Amul Pasteurized Butter 500g', categoryName: 'Dairy & Eggs', batchNumber: 'BATCH-BTR-01', initialQuantity: 20, currentQuantity: 16, costPrice: 245.00, sellingPrice: 275.00, mfgDate: addDays(today, -20), expiryDate: addDays(today, 90), daysUntilExpiry: 90, expiryState: 'SAFE', status: 'ACTIVE' },
+        { id: 6, productId: 4, productName: 'Britannia Processed Cheese Slices 200g', categoryName: 'Dairy & Eggs', batchNumber: 'BATCH-CHS-01', initialQuantity: 15, currentQuantity: 12, costPrice: 130.00, sellingPrice: 150.00, mfgDate: addDays(today, -30), expiryDate: addDays(today, 60), daysUntilExpiry: 60, expiryState: 'SAFE', status: 'ACTIVE' },
+        { id: 7, productId: 5, productName: 'Harvest Gold White Bread 400g', categoryName: 'Bakery & Bread', batchNumber: 'BATCH-BRD-01', initialQuantity: 20, currentQuantity: 8, costPrice: 32.00, sellingPrice: 40.00, mfgDate: addDays(today, -4), expiryDate: addDays(today, 1), daysUntilExpiry: 1, expiryState: 'EXPIRING_SOON', status: 'ACTIVE' },
+        { id: 8, productId: 5, productName: 'Harvest Gold White Bread 400g', categoryName: 'Bakery & Bread', batchNumber: 'BATCH-BRD-02', initialQuantity: 25, currentQuantity: 25, costPrice: 32.00, sellingPrice: 40.00, mfgDate: addDays(today, -1), expiryDate: addDays(today, 4), daysUntilExpiry: 4, expiryState: 'EXPIRING_SOON', status: 'ACTIVE' },
       ],
       movements: [
-        { id: 1, productName: 'Amul Taaza Milk 1L', movementType: 'PURCHASE', quantityChanged: 40, previousQuantity: 24, newQuantity: 64, reason: 'Supplier stock delivery BATCH-MLK-02', referenceCode: 'BATCH-MLK-02', createdAt: new Date(Date.now() - 3600000).toISOString() },
-        { id: 2, productName: 'Parle-G Biscuits 250g', movementType: 'SALE', quantityChanged: -6, previousQuantity: 10, newQuantity: 4, reason: 'POS Bill #POS-8821', referenceCode: 'SALE-8821', createdAt: new Date(Date.now() - 7200000).toISOString() },
+        { id: 1, productName: 'Amul Taaza Homogenised Toned Milk 1L', batchNumber: 'BATCH-MLK-02', movementType: 'PURCHASE', quantityChanged: 40, quantityAfter: 64, reference: 'BATCH-MLK-02', notes: 'Supplier delivery', createdAt: new Date(Date.now() - 3600000).toISOString() },
+        { id: 2, productName: 'Harvest Gold White Bread 400g', batchNumber: 'BATCH-BRD-01', movementType: 'SALE', quantityChanged: -2, quantityAfter: 33, reference: 'POS-8821', notes: 'Walk-in sale', createdAt: new Date(Date.now() - 7200000).toISOString() },
       ],
       sales: [
-        { id: 1, invoiceNumber: 'POS-8821', customerName: 'Walk-in Customer', customerPhone: '+919876543210', totalAmount: 310.00, discountAmount: 0, finalAmount: 310.00, paymentMethod: 'UPI', createdAt: new Date().toISOString(), itemsCount: 4 },
+        {
+          id: 1,
+          invoiceNumber: 'POS-8821',
+          customerName: 'Pooja Sharma',
+          customerPhone: '+919876543210',
+          subtotal: 310.00,
+          discount: 0,
+          tax: 0,
+          totalAmount: 310.00,
+          paymentMethod: 'UPI',
+          saleDate: new Date(Date.now() - 7200000).toISOString(),
+          items: [
+            { id: 1, productId: 1, productName: 'Amul Taaza Homogenised Toned Milk 1L', batchId: 1, batchNumber: 'BATCH-MLK-01', quantity: 2, unitPrice: 60.00, totalPrice: 120.00 },
+            { id: 2, productId: 5, productName: 'Harvest Gold White Bread 400g', batchId: 7, batchNumber: 'BATCH-BRD-01', quantity: 2, unitPrice: 40.00, totalPrice: 80.00 },
+            { id: 3, productId: 7, productName: 'India Gate Basmati Rice Feast Rozzana 1kg', batchId: null, batchNumber: 'FIFO', quantity: 1, unitPrice: 110.00, totalPrice: 110.00 },
+          ],
+        },
       ],
       notifications: {
         preferences: {
@@ -226,9 +335,11 @@ const StockGuardMockDB = {
 
   handle(endpoint, method, body) {
     const db = this.getDB();
-    const cleanEp = endpoint.split('?')[0];
+    const [pathPart, queryPart] = endpoint.split('?');
+    const cleanEp = pathPart;
+    const searchParams = new URLSearchParams(queryPart || '');
 
-    // Auth
+    // Auth Login
     if (cleanEp === '/auth/login') {
       const email = body?.email || 'demo@stockguard.com';
       return {
@@ -243,11 +354,12 @@ const StockGuardMockDB = {
       };
     }
 
+    // Auth Register
     if (cleanEp === '/auth/register') {
-      db.shop.name = body?.shopName || db.shop.name;
-      db.shop.ownerName = body?.ownerName || db.shop.ownerName;
-      db.shop.email = body?.email || db.shop.email;
-      db.shop.phone = body?.phone || db.shop.phone;
+      if (body?.shopName) db.shop.name = body.shopName;
+      if (body?.ownerName) db.shop.ownerName = body.ownerName;
+      if (body?.email) db.shop.email = body.email;
+      if (body?.phone) db.shop.phone = body.phone;
       this.saveDB(db);
       return {
         token: 'eyJhbGciOiJIUzM4NCJ9.eyJyb2xlIjoiT1dORVIiLCJzaG9wSWQiOjEsInN1YiI6ImRlbW9Ac3RvY2tndWFyZC5jb20iLCJpYXQiOjE3OTE2MDY4ODYsImV4cCI6MTc5NTIwMDAwMH0.mock_token_for_vercel',
@@ -261,13 +373,13 @@ const StockGuardMockDB = {
       };
     }
 
-    // Reports / Dashboard
+    // Reports: Dashboard Metrics
     if (cleanEp === '/reports/dashboard') {
       const lowStock = db.products.filter(p => p.currentStock <= p.minStockThreshold).length;
-      const expired = db.batches.filter(b => b.daysUntilExpiry <= 0).length;
-      const expiringSoon = db.batches.filter(b => b.daysUntilExpiry > 0 && b.daysUntilExpiry <= 7).length;
-      const totalUnits = db.products.reduce((acc, p) => acc + p.currentStock, 0);
-      const todayTotal = db.sales.reduce((acc, s) => acc + s.finalAmount, 0);
+      const expired = db.batches.filter(b => b.daysUntilExpiry <= 0 && b.currentQuantity > 0).length;
+      const expiringSoon = db.batches.filter(b => b.daysUntilExpiry > 0 && b.daysUntilExpiry <= 7 && b.currentQuantity > 0).length;
+      const totalUnits = db.products.reduce((acc, p) => acc + (p.currentStock || 0), 0);
+      const todayTotal = db.sales.reduce((acc, s) => acc + (s.totalAmount || 0), 0);
 
       return {
         totalProducts: db.products.length,
@@ -276,59 +388,85 @@ const StockGuardMockDB = {
         expiringSoonCount: expiringSoon,
         expiredCount: expired,
         todaySales: todayTotal,
-        monthlySales: todayTotal + 3116.00,
+        monthlySales: todayTotal + 38450.00,
         todayOrdersCount: db.sales.length,
         currency: db.shop.currency || 'INR',
       };
     }
 
+    // Reports: Monthly Sales Trend (MUST RETURN ARRAY of objects to support monthlyData.map)
     if (cleanEp === '/reports/monthly-sales') {
-      return {
-        months: ['May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct'],
-        sales: [28500, 31200, 29800, 34500, 38200, 42150],
-        orderCounts: [95, 108, 102, 118, 130, 142],
-        categoryBreakdown: {
-          'Dairy & Eggs': 15200,
-          'Bakery & Bread': 7400,
-          'Grains & Staples': 11800,
-          'Beverages': 4500,
-          'Packaged Snacks': 3250,
-        },
-      };
-    }
-
-    if (cleanEp === '/reports/top-products') {
       return [
-        { id: 1, name: 'Amul Taaza Milk 1L', unitsSold: 142, revenue: 8520 },
-        { id: 5, name: 'Harvest Gold Bread 400g', unitsSold: 98, revenue: 3920 },
-        { id: 2, name: 'Nestle A+ Curd 400g', unitsSold: 84, revenue: 3528 },
-        { id: 7, name: 'India Gate Basmati 1kg', unitsSold: 45, revenue: 5175 },
-        { id: 9, name: 'Tata Salt 1kg', unitsSold: 72, revenue: 2016 },
+        { label: 'May', revenue: 28500, orderCount: 95 },
+        { label: 'Jun', revenue: 31200, orderCount: 108 },
+        { label: 'Jul', revenue: 29800, orderCount: 102 },
+        { label: 'Aug', revenue: 34500, orderCount: 118 },
+        { label: 'Sep', revenue: 38200, orderCount: 130 },
+        { label: 'Oct', revenue: 42150, orderCount: 142 },
       ];
     }
 
+    // Reports: Top Products (Array of { productId, productName, unitsSold, totalRevenue })
+    if (cleanEp === '/reports/top-products') {
+      return [
+        { productId: 1, productName: 'Amul Taaza Homogenised Toned Milk 1L', unitsSold: 142, totalRevenue: 8520 },
+        { productId: 5, productName: 'Harvest Gold White Bread 400g', unitsSold: 98, totalRevenue: 3920 },
+        { productId: 2, productName: 'Nestle A+ Nourish Dahi / Curd 400g', unitsSold: 84, totalRevenue: 3528 },
+        { productId: 7, productName: 'India Gate Basmati Rice Feast Rozzana 1kg', unitsSold: 45, totalRevenue: 5175 },
+        { productId: 9, productName: 'Tata Salt Vacuum Evaporated Iodised 1kg', unitsSold: 72, totalRevenue: 2016 },
+      ];
+    }
+
+    // Reports: Expiry Wastage Report
     if (cleanEp === '/reports/expiry-wastage') {
+      const expiredBatches = db.batches.filter(b => b.daysUntilExpiry <= 0 && b.currentQuantity > 0);
+      let totalUnits = 0;
+      let totalLoss = 0;
+      const items = expiredBatches.map(b => {
+        const itemLoss = (b.costPrice || 0) * b.currentQuantity;
+        totalUnits += b.currentQuantity;
+        totalLoss += itemLoss;
+        return {
+          productName: b.productName,
+          batchNumber: b.batchNumber,
+          expiredQuantity: b.currentQuantity,
+          costPrice: b.costPrice,
+          lossAmount: itemLoss,
+          expiryDate: b.expiryDate,
+        };
+      });
+
       return {
-        totalLossValue: 210.00,
-        expiredBatchesCount: 1,
-        quarantinedUnitsCount: 6,
+        totalExpiredBatches: expiredBatches.length,
+        totalExpiredUnits: totalUnits,
+        estimatedLossAmount: totalLoss,
         currency: db.shop.currency || 'INR',
-        lossesByCategory: { 'Dairy & Eggs': 210.00 },
+        items: items,
       };
     }
 
+    // Reports: Export CSV
     if (cleanEp === '/reports/export-csv') {
-      const csv = 'Date,Invoice,Customer,Amount,PaymentMethod\n2026-10-10,POS-8821,Walk-in,310.00,UPI\n';
+      let csv = 'Invoice Number,Date,Customer,Payment Method,Subtotal,Discount,Total Amount\n';
+      db.sales.forEach(s => {
+        csv += `"${s.invoiceNumber}","${s.saleDate}","${s.customerName}","${s.paymentMethod}",${s.subtotal},${s.discount},${s.totalAmount}\n`;
+      });
       return new Blob([csv], { type: 'text/csv' });
     }
 
-    // Alerts
+    // Alerts: Combined Active Alerts
     if (cleanEp === '/alerts') {
-      const lowStock = db.products.filter(p => p.currentStock <= p.minStockThreshold);
-      const expiring = db.batches.filter(b => b.daysUntilExpiry <= 7);
+      const lowStockItems = db.products.filter(p => p.currentStock <= p.minStockThreshold);
+      const expiringSoonItems = db.batches.filter(b => b.daysUntilExpiry > 0 && b.daysUntilExpiry <= 7 && b.currentQuantity > 0);
+      const expiredItems = db.batches.filter(b => b.daysUntilExpiry <= 0 && b.currentQuantity > 0);
+
       return {
-        lowStockProducts: lowStock,
-        expiringBatches: expiring,
+        lowStockCount: lowStockItems.length,
+        lowStockItems: lowStockItems,
+        expiringSoonCount: expiringSoonItems.length,
+        expiringSoonItems: expiringSoonItems,
+        expiredCount: expiredItems.length,
+        expiredItems: expiredItems,
       };
     }
 
@@ -337,108 +475,200 @@ const StockGuardMockDB = {
       return db.categories;
     }
 
-    // Products
+    // Products Catalog
     if (cleanEp === '/products') {
       if (method === 'POST') {
+        const catId = parseInt(body.categoryId) || 1;
+        const cat = db.categories.find(c => c.id === catId);
+        const minThresh = parseInt(body.minStockThreshold || body.minStockAlert || 10);
         const newP = {
           id: db.products.length ? Math.max(...db.products.map(p => p.id)) + 1 : 1,
           shopId: 1,
-          categoryId: body.categoryId,
-          categoryName: db.categories.find(c => c.id === body.categoryId)?.name || 'General',
+          categoryId: catId,
+          categoryName: cat ? cat.name : 'General',
           name: body.name,
-          sku: body.sku || 'SKU-' + Math.floor(Math.random() * 10000),
+          sku: body.sku || 'SKU-' + Math.floor(1000 + Math.random() * 9000),
           barcode: body.barcode || null,
+          description: body.description || '',
           costPrice: parseFloat(body.costPrice || 0),
           sellingPrice: parseFloat(body.sellingPrice || 0),
           currentStock: 0,
-          minStockThreshold: parseInt(body.minStockAlert || db.shop.minStockDefault || 10),
+          minStockThreshold: minThresh,
           unit: body.unit || 'pcs',
           isLowStock: true,
           activeBatchesCount: 0,
           createdAt: new Date().toISOString(),
         };
-        db.products.push(newP);
+        db.products.unshift(newP);
         this.saveDB(db);
         return newP;
       }
-      return db.products;
+
+      // GET: Support filtering by search query and categoryId
+      let list = [...db.products];
+      const search = (searchParams.get('search') || '').toLowerCase().trim();
+      const catFilter = searchParams.get('categoryId');
+
+      if (catFilter) {
+        list = list.filter(p => p.categoryId === parseInt(catFilter));
+      }
+      if (search) {
+        list = list.filter(p =>
+          (p.name && p.name.toLowerCase().includes(search)) ||
+          (p.sku && p.sku.toLowerCase().includes(search)) ||
+          (p.barcode && p.barcode.includes(search))
+        );
+      }
+      return list;
     }
 
+    // Product Single Item Operations
     if (cleanEp.startsWith('/products/')) {
       const id = parseInt(cleanEp.replace('/products/', ''));
       if (method === 'DELETE') {
         db.products = db.products.filter(p => p.id !== id);
+        db.batches = db.batches.filter(b => b.productId !== id);
         this.saveDB(db);
         return null;
       }
       if (method === 'PUT') {
         const idx = db.products.findIndex(p => p.id === id);
         if (idx !== -1) {
-          db.products[idx] = { ...db.products[idx], ...body };
+          const p = db.products[idx];
+          if (body.name !== undefined) p.name = body.name;
+          if (body.sku !== undefined) p.sku = body.sku;
+          if (body.barcode !== undefined) p.barcode = body.barcode;
+          if (body.description !== undefined) p.description = body.description;
+          if (body.costPrice !== undefined) p.costPrice = parseFloat(body.costPrice);
+          if (body.sellingPrice !== undefined) p.sellingPrice = parseFloat(body.sellingPrice);
+          if (body.minStockThreshold !== undefined) p.minStockThreshold = parseInt(body.minStockThreshold);
+          if (body.unit !== undefined) p.unit = body.unit;
+          if (body.categoryId !== undefined) {
+            p.categoryId = parseInt(body.categoryId);
+            const cat = db.categories.find(c => c.id === p.categoryId);
+            if (cat) p.categoryName = cat.name;
+          }
+          p.isLowStock = (p.currentStock || 0) <= p.minStockThreshold;
           this.saveDB(db);
-          return db.products[idx];
+          return p;
         }
       }
       return db.products.find(p => p.id === id) || null;
     }
 
-    // Batches
+    // Batches & Expiry Management
     if (cleanEp === '/batches') {
       if (method === 'POST') {
-        const prod = db.products.find(p => p.id === parseInt(body.productId));
+        const prodId = parseInt(body.productId);
+        const prod = db.products.find(p => p.id === prodId);
+        const qty = parseInt(body.quantity || 0);
+        const cost = parseFloat(body.costPrice !== undefined ? body.costPrice : (body.purchaseCost || (prod ? prod.costPrice : 0)));
+        const sell = parseFloat(body.sellingPrice !== undefined ? body.sellingPrice : (prod ? prod.sellingPrice : 0));
+        const expDate = body.expiryDate;
+        const daysUntil = Math.ceil((new Date(expDate) - new Date()) / (1000 * 60 * 60 * 24));
+        const state = daysUntil <= 0 ? 'EXPIRED' : (daysUntil <= 7 ? 'EXPIRING_SOON' : 'SAFE');
+
         const newB = {
           id: db.batches.length ? Math.max(...db.batches.map(b => b.id)) + 1 : 1,
-          productId: body.productId,
+          productId: prodId,
           productName: prod ? prod.name : 'Product',
-          batchNumber: body.batchNumber || 'BATCH-' + Math.floor(Math.random() * 1000),
-          initialQuantity: parseInt(body.quantity),
-          remainingQuantity: parseInt(body.quantity),
-          purchaseCost: parseFloat(body.purchaseCost || (prod ? prod.costPrice : 0)),
-          sellingPrice: parseFloat(body.sellingPrice || (prod ? prod.sellingPrice : 0)),
-          mfgDate: body.mfgDate,
-          expiryDate: body.expiryDate,
-          daysUntilExpiry: Math.ceil((new Date(body.expiryDate) - new Date()) / (1000 * 60 * 60 * 24)),
-          status: 'SAFE',
+          categoryName: prod ? prod.categoryName : 'General',
+          batchNumber: body.batchNumber || 'BATCH-' + Math.floor(1000 + Math.random() * 9000),
+          initialQuantity: qty,
+          currentQuantity: qty,
+          costPrice: cost,
+          sellingPrice: sell,
+          mfgDate: body.mfgDate || null,
+          expiryDate: expDate,
+          daysUntilExpiry: daysUntil,
+          expiryState: state,
+          status: daysUntil <= 0 ? 'EXPIRED' : 'ACTIVE',
+          createdAt: new Date().toISOString(),
         };
-        db.batches.push(newB);
-        if (prod) prod.currentStock += newB.remainingQuantity;
+
+        db.batches.unshift(newB);
+
+        // Update product stock and re-evaluate low stock
+        if (prod) {
+          prod.currentStock = (prod.currentStock || 0) + qty;
+          prod.isLowStock = prod.currentStock <= prod.minStockThreshold;
+          prod.activeBatchesCount = db.batches.filter(b => b.productId === prod.id && b.currentQuantity > 0).length;
+        }
+
+        // Add movement log
+        db.movements.unshift({
+          id: db.movements.length + 1,
+          productName: prod ? prod.name : newB.productName,
+          batchNumber: newB.batchNumber,
+          movementType: 'PURCHASE',
+          quantityChanged: qty,
+          quantityAfter: prod ? prod.currentStock : qty,
+          reference: newB.batchNumber,
+          notes: `Batch intake for ${newB.batchNumber}`,
+          createdAt: new Date().toISOString(),
+        });
+
         this.saveDB(db);
         return newB;
       }
       return db.batches;
     }
 
+    // Discard Expired Batch
     if (cleanEp.includes('/discard')) {
-      const batchId = parseInt(cleanEp.split('/')[2]);
+      const parts = cleanEp.split('/');
+      const batchId = parseInt(parts[2]);
       const b = db.batches.find(x => x.id === batchId);
       if (b) {
+        const discardedQty = b.currentQuantity || 0;
         const prod = db.products.find(p => p.id === b.productId);
-        if (prod) prod.currentStock = Math.max(0, prod.currentStock - b.remainingQuantity);
-        b.remainingQuantity = 0;
+        if (prod && discardedQty > 0) {
+          prod.currentStock = Math.max(0, (prod.currentStock || 0) - discardedQty);
+          prod.isLowStock = prod.currentStock <= prod.minStockThreshold;
+          prod.activeBatchesCount = db.batches.filter(x => x.productId === prod.id && x.id !== b.id && x.currentQuantity > 0).length;
+        }
+        b.currentQuantity = 0;
         b.status = 'DISCARDED';
+        b.expiryState = 'EXPIRED';
+
+        db.movements.unshift({
+          id: db.movements.length + 1,
+          productName: b.productName,
+          batchNumber: b.batchNumber,
+          movementType: 'EXPIRED_SCRAP',
+          quantityChanged: -discardedQty,
+          quantityAfter: prod ? prod.currentStock : 0,
+          reference: 'SCRAP-' + b.batchNumber,
+          notes: body?.reason || 'Expired batch quarantined and discarded',
+          createdAt: new Date().toISOString(),
+        });
+
         this.saveDB(db);
       }
       return { message: 'Batch quarantined and discarded' };
     }
 
-    // Inventory Adjust & Movements
+    // Inventory Adjustments
     if (cleanEp === '/inventory/adjust') {
-      const p = db.products.find(x => x.id === parseInt(body.productId));
+      const prodId = parseInt(body.productId);
+      const p = db.products.find(x => x.id === prodId);
       if (p) {
-        const diff = parseInt(body.quantityDifference);
-        const oldQty = p.currentStock;
-        p.currentStock = Math.max(0, p.currentStock + diff);
+        const diff = parseInt(body.quantityDifference || 0);
+        p.currentStock = Math.max(0, (p.currentStock || 0) + diff);
+        p.isLowStock = p.currentStock <= p.minStockThreshold;
+
         db.movements.unshift({
           id: db.movements.length + 1,
           productName: p.name,
-          movementType: diff >= 0 ? 'ADJUST_ADD' : 'ADJUST_SUB',
+          batchNumber: 'N/A',
+          movementType: 'ADJUSTMENT',
           quantityChanged: diff,
-          previousQuantity: oldQty,
-          newQuantity: p.currentStock,
-          reason: body.reason || 'Manual count correction',
-          referenceCode: 'ADJ-' + Date.now().toString().slice(-4),
+          quantityAfter: p.currentStock,
+          reference: 'ADJ-' + Date.now().toString().slice(-4),
+          notes: body.reason || 'Manual count correction',
           createdAt: new Date().toISOString(),
         });
+
         this.saveDB(db);
       }
       return { message: 'Stock adjusted successfully' };
@@ -448,38 +678,79 @@ const StockGuardMockDB = {
       return db.movements;
     }
 
-    // Sales POS
+    // Sales POS Engine
     if (cleanEp === '/sales') {
       if (method === 'POST') {
         const invoiceNum = 'POS-' + Math.floor(1000 + Math.random() * 9000);
-        const items = body.items || [];
-        let total = 0;
-        items.forEach(it => {
-          total += (it.quantity * it.unitPrice);
-          const p = db.products.find(prod => prod.id === it.productId);
-          if (p) p.currentStock = Math.max(0, p.currentStock - it.quantity);
+        const reqItems = body.items || [];
+        let subtotal = 0;
+        const saleItems = [];
+
+        reqItems.forEach(it => {
+          const prodId = parseInt(it.productId);
+          const prod = db.products.find(p => p.id === prodId);
+          const qty = parseInt(it.quantity || 1);
+          const unitPrice = parseFloat(it.unitPrice !== undefined ? it.unitPrice : (prod ? prod.sellingPrice : 0));
+          const lineTotal = qty * unitPrice;
+          subtotal += lineTotal;
+
+          if (prod) {
+            prod.currentStock = Math.max(0, (prod.currentStock || 0) - qty);
+            prod.isLowStock = prod.currentStock <= prod.minStockThreshold;
+
+            // FIFO deduction from product batches
+            let toDeduct = qty;
+            const prodBatches = db.batches.filter(b => b.productId === prod.id && b.currentQuantity > 0);
+            for (const b of prodBatches) {
+              if (toDeduct <= 0) break;
+              const take = Math.min(b.currentQuantity, toDeduct);
+              b.currentQuantity -= take;
+              toDeduct -= take;
+            }
+            prod.activeBatchesCount = db.batches.filter(b => b.productId === prod.id && b.currentQuantity > 0).length;
+
+            db.movements.unshift({
+              id: db.movements.length + 1,
+              productName: prod.name,
+              batchNumber: prodBatches[0]?.batchNumber || 'FIFO',
+              movementType: 'SALE',
+              quantityChanged: -qty,
+              quantityAfter: prod.currentStock,
+              reference: invoiceNum,
+              notes: `POS sale to ${body.customerName || 'Walk-in Customer'}`,
+              createdAt: new Date().toISOString(),
+            });
+          }
+
+          saleItems.push({
+            id: saleItems.length + 1,
+            productId: prodId,
+            productName: prod ? prod.name : 'Item',
+            batchId: null,
+            batchNumber: 'FIFO',
+            quantity: qty,
+            unitPrice: unitPrice,
+            totalPrice: lineTotal,
+          });
         });
 
+        const discount = parseFloat(body.discount || body.discountAmount || 0);
+        const totalAmount = Math.max(0, subtotal - discount);
+
         const newSale = {
-          id: db.sales.length + 1,
+          id: db.sales.length ? Math.max(...db.sales.map(s => s.id)) + 1 : 1,
           invoiceNumber: invoiceNum,
           customerName: body.customerName || 'Walk-in Customer',
           customerPhone: body.customerPhone || '',
-          totalAmount: total,
-          discountAmount: body.discountAmount || 0,
-          finalAmount: Math.max(0, total - (body.discountAmount || 0)),
+          subtotal: subtotal,
+          tax: 0,
+          discount: discount,
+          totalAmount: totalAmount,
           paymentMethod: body.paymentMethod || 'CASH',
-          createdAt: new Date().toISOString(),
-          items: items.map(it => {
-            const pr = db.products.find(p => p.id === it.productId);
-            return {
-              productName: pr ? pr.name : 'Item',
-              quantity: it.quantity,
-              unitPrice: it.unitPrice,
-              subtotal: it.quantity * it.unitPrice,
-            };
-          }),
+          saleDate: new Date().toISOString(),
+          items: saleItems,
         };
+
         db.sales.unshift(newSale);
         this.saveDB(db);
         return newSale;
@@ -492,7 +763,7 @@ const StockGuardMockDB = {
       return db.sales.find(s => s.id === id) || db.sales[0];
     }
 
-    // Notifications
+    // Notifications & WhatsApp Alerts
     if (cleanEp === '/notifications/preferences') {
       if (method === 'PUT') {
         db.notifications.preferences = { ...db.notifications.preferences, ...body };
