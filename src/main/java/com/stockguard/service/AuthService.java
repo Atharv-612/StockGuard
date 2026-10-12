@@ -31,6 +31,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
+    private final AuditService auditService;
 
     public AuthService(UserRepository userRepository,
                        ShopRepository shopRepository,
@@ -38,7 +39,8 @@ public class AuthService {
                        NotificationPreferenceRepository notificationPreferenceRepository,
                        PasswordEncoder passwordEncoder,
                        JwtService jwtService,
-                       AuthenticationManager authenticationManager) {
+                       AuthenticationManager authenticationManager,
+                       AuditService auditService) {
         this.userRepository = userRepository;
         this.shopRepository = shopRepository;
         this.categoryRepository = categoryRepository;
@@ -46,6 +48,7 @@ public class AuthService {
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.authenticationManager = authenticationManager;
+        this.auditService = auditService;
     }
 
     @Transactional
@@ -65,14 +68,14 @@ public class AuthService {
         shop.setExpiryWarningDays(7);
         Shop savedShop = shopRepository.save(shop);
 
-        // 2. Create User
+        // 2. Create User as SHOP_OWNER
         User user = new User();
         user.setShop(savedShop);
         user.setEmail(request.getEmail());
         user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
         user.setFullName(request.getOwnerName());
         user.setPhone(request.getPhone());
-        user.setRole("OWNER");
+        user.setRole("SHOP_OWNER");
         user.setActive(true);
         User savedUser = userRepository.save(user);
 
@@ -91,6 +94,10 @@ public class AuthService {
 
         // 5. Generate JWT Token
         String token = jwtService.generateToken(savedUser.getEmail(), savedShop.getId(), savedUser.getRole());
+
+        auditService.logEvent(savedShop.getId(), savedUser.getId(), savedUser.getEmail(),
+                "REGISTER_SUCCESS", "SHOP", savedShop.getId().toString(),
+                "New shop registered: " + savedShop.getName() + " with owner: " + savedUser.getEmail(), null, "SUCCESS");
 
         return new AuthDto.AuthResponse(
                 token,
@@ -115,6 +122,10 @@ public class AuthService {
         Shop shop = user.getShop();
         String token = jwtService.generateToken(user.getEmail(), shop.getId(), user.getRole());
 
+        auditService.logEvent(shop.getId(), user.getId(), user.getEmail(),
+                "LOGIN_SUCCESS", "AUTH", user.getId().toString(),
+                "User logged in successfully (Role: " + user.getRole() + ")", null, "SUCCESS");
+
         return new AuthDto.AuthResponse(
                 token,
                 user.getId(),
@@ -125,6 +136,60 @@ public class AuthService {
                 shop.getName(),
                 shop.getCurrency()
         );
+    }
+
+    @Transactional
+    public AuthDto.UserResponse createUserForShop(AuthDto.CreateUserRequest request) {
+        User currentUser = getCurrentAuthenticatedUser();
+        Shop shop = currentUser.getShop();
+
+        // Enforce role creation constraints: only MANAGER or STAFF
+        String targetRole = request.getRole() != null ? request.getRole().trim().toUpperCase() : "STAFF";
+        if (!targetRole.equals("MANAGER") && !targetRole.equals("STAFF")) {
+            throw new BusinessException("Assigned role must be either 'MANAGER' or 'STAFF'");
+        }
+
+        if (userRepository.existsByEmail(request.getEmail())) {
+            throw new BusinessException("User with email " + request.getEmail() + " already exists");
+        }
+
+        User newUser = new User();
+        newUser.setShop(shop);
+        newUser.setEmail(request.getEmail());
+        newUser.setFullName(request.getFullName());
+        newUser.setPhone(request.getPhone());
+        newUser.setPasswordHash(passwordEncoder.encode(request.getPassword()));
+        newUser.setRole(targetRole);
+        newUser.setActive(true);
+
+        User saved = userRepository.save(newUser);
+
+        auditService.logEvent(shop.getId(), currentUser.getId(), currentUser.getEmail(),
+                "USER_CREATED", "USER", saved.getId().toString(),
+                "Created team member " + saved.getEmail() + " with role " + targetRole, null, "SUCCESS");
+
+        return new AuthDto.UserResponse(
+                saved.getId(),
+                saved.getEmail(),
+                saved.getFullName(),
+                saved.getPhone(),
+                saved.getRole(),
+                saved.getActive()
+        );
+    }
+
+    public List<AuthDto.UserResponse> getUsersForCurrentShop() {
+        Shop shop = getCurrentUserShop();
+        return userRepository.findByShopIdOrderByCreatedAtAsc(shop.getId()).stream()
+                .map(u -> new AuthDto.UserResponse(
+                        u.getId(),
+                        u.getEmail(),
+                        u.getFullName(),
+                        u.getPhone(),
+                        u.getRole(),
+                        u.getActive()
+                ))
+                .collect(java.util.stream.Collectors.toList());
     }
 
     public User getCurrentAuthenticatedUser() {

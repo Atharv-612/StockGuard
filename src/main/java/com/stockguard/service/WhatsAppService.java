@@ -38,14 +38,17 @@ public class WhatsAppService {
     private final NotificationLogRepository notificationLogRepository;
     private final NotificationPreferenceRepository preferenceRepository;
     private final AuthService authService;
+    private final AuditService auditService;
     private final RestTemplate restTemplate = new RestTemplate();
 
     public WhatsAppService(NotificationLogRepository notificationLogRepository,
                            NotificationPreferenceRepository preferenceRepository,
-                           AuthService authService) {
+                           AuthService authService,
+                           AuditService auditService) {
         this.notificationLogRepository = notificationLogRepository;
         this.preferenceRepository = preferenceRepository;
         this.authService = authService;
+        this.auditService = auditService;
     }
 
     public NotificationDto.NotificationPreferenceDto getPreferences() {
@@ -64,16 +67,26 @@ public class WhatsAppService {
         dto.setEnableDailySales(pref.getEnableDailySales());
         dto.setWhatsappPhone(pref.getWhatsappPhone());
         dto.setExpiryWarningDays(pref.getExpiryWarningDays());
-        dto.setMetaApiToken(pref.getMetaApiToken() != null && !pref.getMetaApiToken().isBlank() ? pref.getMetaApiToken() : this.apiToken);
+
+        // Mask sensitive token for security
+        String rawToken = (pref.getMetaApiToken() != null && !pref.getMetaApiToken().isBlank())
+                ? pref.getMetaApiToken().trim()
+                : (this.apiToken != null ? this.apiToken.trim() : "");
+        String maskedToken = (!rawToken.isBlank())
+                ? "••••••••" + (rawToken.length() > 4 ? rawToken.substring(rawToken.length() - 4) : "")
+                : "";
+        dto.setMetaApiToken(maskedToken);
+
         dto.setPhoneNumberId(pref.getPhoneNumberId() != null && !pref.getPhoneNumberId().isBlank() ? pref.getPhoneNumberId() : this.phoneNumberId);
         dto.setBusinessAccountId(pref.getBusinessAccountId());
-        dto.setUseLiveApi(pref.getUseLiveApi() != null ? pref.getUseLiveApi() : (!mockMode && this.apiToken != null && !this.apiToken.isBlank()));
+        dto.setUseLiveApi(pref.getUseLiveApi() != null ? pref.getUseLiveApi() : (!mockMode && !rawToken.isBlank()));
         return dto;
     }
 
     @Transactional
     public NotificationDto.NotificationPreferenceDto updatePreferences(NotificationDto.NotificationPreferenceDto dto) {
         Shop shop = authService.getCurrentUserShop();
+        var user = authService.getCurrentAuthenticatedUser();
         NotificationPreference pref = preferenceRepository.findByShopId(shop.getId())
                 .orElseGet(() -> {
                     NotificationPreference np = new NotificationPreference();
@@ -89,23 +102,24 @@ public class WhatsAppService {
             pref.setExpiryWarningDays(dto.getExpiryWarningDays());
             shop.setExpiryWarningDays(dto.getExpiryWarningDays());
         }
-        if (dto.getMetaApiToken() != null) pref.setMetaApiToken(dto.getMetaApiToken());
+        // Only update token if a new real token is provided (not our masked string)
+        if (dto.getMetaApiToken() != null && !dto.getMetaApiToken().isBlank()) {
+            String tokenValue = dto.getMetaApiToken().trim();
+            if (!tokenValue.startsWith("••••")) {
+                pref.setMetaApiToken(tokenValue);
+            }
+        }
         if (dto.getPhoneNumberId() != null) pref.setPhoneNumberId(dto.getPhoneNumberId());
         if (dto.getBusinessAccountId() != null) pref.setBusinessAccountId(dto.getBusinessAccountId());
         if (dto.getUseLiveApi() != null) pref.setUseLiveApi(dto.getUseLiveApi());
 
         NotificationPreference saved = preferenceRepository.save(pref);
-        NotificationDto.NotificationPreferenceDto res = new NotificationDto.NotificationPreferenceDto();
-        res.setEnableLowStock(saved.getEnableLowStock());
-        res.setEnableExpiry(saved.getEnableExpiry());
-        res.setEnableDailySales(saved.getEnableDailySales());
-        res.setWhatsappPhone(saved.getWhatsappPhone());
-        res.setExpiryWarningDays(saved.getExpiryWarningDays());
-        res.setMetaApiToken(saved.getMetaApiToken());
-        res.setPhoneNumberId(saved.getPhoneNumberId());
-        res.setBusinessAccountId(saved.getBusinessAccountId());
-        res.setUseLiveApi(saved.getUseLiveApi());
-        return res;
+
+        auditService.logEvent(shop.getId(), user.getId(), user.getEmail(),
+                "WHATSAPP_CONFIG_UPDATED", "NOTIFICATION_PREF", saved.getId().toString(),
+                "Updated WhatsApp alert preferences (LiveMode=" + saved.getUseLiveApi() + ")", null, "SUCCESS");
+
+        return getPreferences();
     }
 
     public List<NotificationDto.NotificationLogDto> getNotificationLogs() {

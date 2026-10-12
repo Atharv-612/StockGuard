@@ -21,10 +21,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final UserDetailsService userDetailsService;
+    private final com.stockguard.service.TokenBlacklistService tokenBlacklistService;
+    private final com.stockguard.service.TokenBlocklistService tokenBlocklistService;
 
-    public JwtAuthenticationFilter(JwtService jwtService, UserDetailsService userDetailsService) {
+    public JwtAuthenticationFilter(JwtService jwtService,
+                                   UserDetailsService userDetailsService,
+                                   com.stockguard.service.TokenBlacklistService tokenBlacklistService,
+                                   com.stockguard.service.TokenBlocklistService tokenBlocklistService) {
         this.jwtService = jwtService;
         this.userDetailsService = userDetailsService;
+        this.tokenBlacklistService = tokenBlacklistService;
+        this.tokenBlocklistService = tokenBlocklistService;
     }
 
     @Override
@@ -45,6 +52,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         jwt = authHeader.substring(7);
         try {
+            if (tokenBlacklistService.isBlacklisted(jwt)) {
+                filterChain.doFilter(request, response);
+                return;
+            }
+
+            String jti = jwtService.extractJti(jwt);
+            if (jti != null && tokenBlocklistService.isRevoked(jti)) {
+                filterChain.doFilter(request, response);
+                return;
+            }
+
             userEmail = jwtService.extractUsername(jwt);
             if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                 UserDetails userDetails = this.userDetailsService.loadUserByUsername(userEmail);

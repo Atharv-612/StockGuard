@@ -137,9 +137,37 @@ CREATE TABLE IF NOT EXISTS notification_preferences (
     CONSTRAINT fk_pref_shop FOREIGN KEY (shop_id) REFERENCES shops(id) ON DELETE CASCADE
 );
 
+-- Security & Compliance Audit Trail
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    shop_id BIGINT,
+    user_id BIGINT,
+    user_email VARCHAR(120),
+    action VARCHAR(80) NOT NULL,
+    entity_type VARCHAR(50),
+    entity_id VARCHAR(50),
+    details TEXT,
+    ip_address VARCHAR(60),
+    status VARCHAR(30) DEFAULT 'SUCCESS',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_audit_shop FOREIGN KEY (shop_id) REFERENCES shops(id) ON DELETE SET NULL
+);
+
+-- Token Revocation Blocklist
+CREATE TABLE IF NOT EXISTS token_blocklist (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    jti VARCHAR(100) NOT NULL UNIQUE,
+    user_email VARCHAR(120) NOT NULL,
+    expires_at TIMESTAMP NOT NULL,
+    revoked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    revoke_reason VARCHAR(50) DEFAULT 'LOGOUT'
+);
+
 -- Optimized Indexes
 CREATE INDEX IF NOT EXISTS idx_prod_shop ON products(shop_id);
 CREATE INDEX IF NOT EXISTS idx_batch_expiry ON product_batches(expiry_date);
 CREATE INDEX IF NOT EXISTS idx_batch_prod ON product_batches(product_id);
 CREATE INDEX IF NOT EXISTS idx_sales_shop_date ON sales(shop_id, sale_date);
 CREATE INDEX IF NOT EXISTS idx_mov_prod ON stock_movements(product_id);
+CREATE INDEX IF NOT EXISTS idx_audit_shop_time ON audit_logs(shop_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_logs(action);

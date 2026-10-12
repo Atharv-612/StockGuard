@@ -23,17 +23,20 @@ public class SaleService {
     private final ProductBatchRepository batchRepository;
     private final StockMovementRepository stockMovementRepository;
     private final AuthService authService;
+    private final AuditService auditService;
 
     public SaleService(SaleRepository saleRepository,
                        ProductRepository productRepository,
                        ProductBatchRepository batchRepository,
                        StockMovementRepository stockMovementRepository,
-                       AuthService authService) {
+                       AuthService authService,
+                       AuditService auditService) {
         this.saleRepository = saleRepository;
         this.productRepository = productRepository;
         this.batchRepository = batchRepository;
         this.stockMovementRepository = stockMovementRepository;
         this.authService = authService;
+        this.auditService = auditService;
     }
 
     public List<SaleDto.SaleResponse> getAllSales() {
@@ -162,6 +165,10 @@ public class SaleService {
         sale.setItems(saleItems);
 
         Sale savedSale = saleRepository.save(sale);
+        auditService.logEvent(shop.getId(), user.getId(), user.getEmail(),
+                "SALE_PROCESSED", "SALE", savedSale.getId().toString(),
+                "Invoice: " + savedSale.getInvoiceNumber() + ", Amount: " + savedSale.getTotalAmount() + ", Items: " + (savedSale.getItems() != null ? savedSale.getItems().size() : 0),
+                null, "SUCCESS");
         return mapToResponse(savedSale);
     }
 

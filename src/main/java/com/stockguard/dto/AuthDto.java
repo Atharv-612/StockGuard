@@ -97,4 +97,61 @@ public class AuthDto {
         public String getCurrency() { return currency; }
         public void setCurrency(String currency) { this.currency = currency; }
     }
+
+    public static class CreateUserRequest {
+        @NotBlank(message = "Email is required")
+        @Email(message = "Invalid email format")
+        private String email;
+
+        @NotBlank(message = "Full name is required")
+        private String fullName;
+
+        private String phone;
+
+        @NotBlank(message = "Password is required")
+        @Size(min = 6, message = "Password must be at least 6 characters")
+        private String password;
+
+        @NotBlank(message = "Role is required (MANAGER or STAFF)")
+        private String role; // MANAGER, STAFF
+
+        public CreateUserRequest() {}
+
+        public String getEmail() { return email; }
+        public void setEmail(String email) { this.email = email; }
+        public String getFullName() { return fullName; }
+        public void setFullName(String fullName) { this.fullName = fullName; }
+        public String getPhone() { return phone; }
+        public void setPhone(String phone) { this.phone = phone; }
+        public String getPassword() { return password; }
+        public void setPassword(String password) { this.password = password; }
+        public String getRole() { return role; }
+        public void setRole(String role) { this.role = role; }
+    }
+
+    public static class UserResponse {
+        private Long id;
+        private String email;
+        private String fullName;
+        private String phone;
+        private String role;
+        private Boolean active;
+
+        public UserResponse() {}
+        public UserResponse(Long id, String email, String fullName, String phone, String role, Boolean active) {
+            this.id = id;
+            this.email = email;
+            this.fullName = fullName;
+            this.phone = phone;
+            this.role = role;
+            this.active = active;
+        }
+
+        public Long getId() { return id; }
+        public String getEmail() { return email; }
+        public String getFullName() { return fullName; }
+        public String getPhone() { return phone; }
+        public String getRole() { return role; }
+        public Boolean getActive() { return active; }
+    }
 }

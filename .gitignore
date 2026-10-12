@@ -15,6 +15,21 @@ target/
 
 ### Environment & Database ###
 .env
+.env.*
+!.env.example
 *.mv.db
 *.lock.db
 *.trace.db
+
+### Secrets, Keys & Backups ###
+*.pem
+*.key
+*.p12
+*.jks
+*.pfx
+*.sql
+!src/main/resources/schema.sql
+!least_privilege_user.sql
+*.sql.gz
+*.sql.enc
+backups/

@@ -25,15 +25,18 @@ public class BatchService {
     private final ProductRepository productRepository;
     private final StockMovementRepository stockMovementRepository;
     private final AuthService authService;
+    private final AuditService auditService;
 
     public BatchService(ProductBatchRepository batchRepository,
                         ProductRepository productRepository,
                         StockMovementRepository stockMovementRepository,
-                        AuthService authService) {
+                        AuthService authService,
+                        AuditService auditService) {
         this.batchRepository = batchRepository;
         this.productRepository = productRepository;
         this.stockMovementRepository = stockMovementRepository;
         this.authService = authService;
+        this.auditService = auditService;
     }
 
     public List<BatchDto.BatchResponse> getAllBatches(String filter) {
@@ -106,6 +109,11 @@ public class BatchService {
         movement.setNotes("New inventory batch received");
         stockMovementRepository.save(movement);
 
+        var currentUser = authService.getCurrentAuthenticatedUser();
+        auditService.logEvent(shop.getId(), currentUser.getId(), currentUser.getEmail(),
+                "BATCH_CREATED", "BATCH", savedBatch.getId().toString(),
+                "Created batch '" + savedBatch.getBatchNumber() + "' for product " + product.getName() + " (qty: " + request.getQuantity() + ")", null, "SUCCESS");
+
         int warningDays = shop.getExpiryWarningDays() != null ? shop.getExpiryWarningDays() : 7;
         return mapToResponse(savedBatch, warningDays);
     }
@@ -113,6 +121,7 @@ public class BatchService {
     @Transactional
     public void discardExpiredBatch(Long batchId, String reason) {
         Shop shop = authService.getCurrentUserShop();
+        var currentUser = authService.getCurrentAuthenticatedUser();
         ProductBatch batch = batchRepository.findByIdAndProductShopId(batchId, shop.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Batch not found with id: " + batchId));
 
@@ -141,6 +150,10 @@ public class BatchService {
         movement.setReference("SCRAP-" + batch.getBatchNumber());
         movement.setNotes(reason != null ? reason : "Expired stock discarded");
         stockMovementRepository.save(movement);
+
+        auditService.logEvent(shop.getId(), currentUser.getId(), currentUser.getEmail(),
+                "BATCH_DISCARDED", "BATCH", batchId.toString(),
+                "Discarded expired batch '" + batch.getBatchNumber() + "' (qty: " + quantityToRemove + "). Reason: " + reason, null, "SUCCESS");
     }
 
     public BatchDto.BatchResponse mapToResponse(ProductBatch batch, int warningDays) {

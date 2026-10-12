@@ -20,18 +20,22 @@ public class InventoryService {
     private final ProductRepository productRepository;
     private final StockMovementRepository stockMovementRepository;
     private final AuthService authService;
+    private final AuditService auditService;
 
     public InventoryService(ProductRepository productRepository,
                             StockMovementRepository stockMovementRepository,
-                            AuthService authService) {
+                            AuthService authService,
+                            AuditService auditService) {
         this.productRepository = productRepository;
         this.stockMovementRepository = stockMovementRepository;
         this.authService = authService;
+        this.auditService = auditService;
     }
 
     @Transactional
     public void adjustStock(Long productId, int quantityDifference, String reason) {
         Shop shop = authService.getCurrentUserShop();
+        var currentUser = authService.getCurrentAuthenticatedUser();
         Product product = productRepository.findByIdAndShopId(productId, shop.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + productId));
 
@@ -53,6 +57,10 @@ public class InventoryService {
         movement.setReference("ADJ-" + System.currentTimeMillis() % 10000);
         movement.setNotes(reason != null ? reason : "Manual inventory adjustment");
         stockMovementRepository.save(movement);
+
+        auditService.logEvent(shop.getId(), currentUser.getId(), currentUser.getEmail(),
+                "STOCK_ADJUSTMENT", "PRODUCT", productId.toString(),
+                "Stock adjusted by " + quantityDifference + " (new total: " + newStock + ") on " + product.getName() + ". Reason: " + reason, null, "SUCCESS");
     }
 
     public List<ReportDto.StockMovementDto> getRecentMovements() {

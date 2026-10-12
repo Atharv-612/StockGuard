@@ -19,13 +19,16 @@ public class ProductService {
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
     private final AuthService authService;
+    private final AuditService auditService;
 
     public ProductService(ProductRepository productRepository,
                           CategoryRepository categoryRepository,
-                          AuthService authService) {
+                          AuthService authService,
+                          AuditService auditService) {
         this.productRepository = productRepository;
         this.categoryRepository = categoryRepository;
         this.authService = authService;
+        this.auditService = auditService;
     }
 
     public List<ProductDto.ProductResponse> getAllProducts(String search, Long categoryId) {
@@ -55,6 +58,7 @@ public class ProductService {
     @Transactional
     public ProductDto.ProductResponse createProduct(ProductDto.ProductRequest request) {
         Shop shop = authService.getCurrentUserShop();
+        var currentUser = authService.getCurrentAuthenticatedUser();
 
         Product product = new Product();
         product.setShop(shop);
@@ -69,18 +73,22 @@ public class ProductService {
         product.setUnit(request.getUnit() != null ? request.getUnit() : "pcs");
 
         if (request.getCategoryId() != null) {
-            Category category = categoryRepository.findById(request.getCategoryId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + request.getCategoryId()));
+            Category category = categoryRepository.findByIdAndShopId(request.getCategoryId(), shop.getId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Category not found or does not belong to this shop: " + request.getCategoryId()));
             product.setCategory(category);
         }
 
         Product saved = productRepository.save(product);
+        auditService.logEvent(shop.getId(), currentUser.getId(), currentUser.getEmail(),
+                "PRODUCT_CREATED", "PRODUCT", saved.getId().toString(),
+                "Created product '" + saved.getName() + "' with price " + saved.getSellingPrice(), null, "SUCCESS");
         return mapToResponse(saved);
     }
 
     @Transactional
     public ProductDto.ProductResponse updateProduct(Long id, ProductDto.ProductRequest request) {
         Shop shop = authService.getCurrentUserShop();
+        var currentUser = authService.getCurrentAuthenticatedUser();
         Product product = productRepository.findByIdAndShopId(id, shop.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + id));
 
@@ -96,23 +104,31 @@ public class ProductService {
         if (request.getUnit() != null) product.setUnit(request.getUnit());
 
         if (request.getCategoryId() != null) {
-            Category category = categoryRepository.findById(request.getCategoryId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + request.getCategoryId()));
+            Category category = categoryRepository.findByIdAndShopId(request.getCategoryId(), shop.getId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Category not found or does not belong to this shop: " + request.getCategoryId()));
             product.setCategory(category);
         } else {
             product.setCategory(null);
         }
 
         Product saved = productRepository.save(product);
+        auditService.logEvent(shop.getId(), currentUser.getId(), currentUser.getEmail(),
+                "PRODUCT_UPDATED", "PRODUCT", saved.getId().toString(),
+                "Updated product details for '" + saved.getName() + "'", null, "SUCCESS");
         return mapToResponse(saved);
     }
 
     @Transactional
     public void deleteProduct(Long id) {
         Shop shop = authService.getCurrentUserShop();
+        var currentUser = authService.getCurrentAuthenticatedUser();
         Product product = productRepository.findByIdAndShopId(id, shop.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + id));
+        String prodName = product.getName();
         productRepository.delete(product);
+        auditService.logEvent(shop.getId(), currentUser.getId(), currentUser.getEmail(),
+                "PRODUCT_DELETED", "PRODUCT", id.toString(),
+                "Deleted product '" + prodName + "'", null, "SUCCESS");
     }
 
     public ProductDto.ProductResponse mapToResponse(Product product) {

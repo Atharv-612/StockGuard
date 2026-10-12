@@ -83,11 +83,19 @@ const Auth = {
     }
   },
 
-  logout(redirect = true) {
-    API.setToken(null);
-    this.setUser(null);
-    if (redirect) {
-      window.location.href = '/app.html?view=login';
+  async logout(redirect = true) {
+    try {
+      if (API.getToken()) {
+        await API.post('/auth/logout', {});
+      }
+    } catch (e) {
+      // Ignore network errors on logout
+    } finally {
+      API.setToken(null);
+      this.setUser(null);
+      if (redirect) {
+        window.location.href = '/app.html?view=login';
+      }
     }
   },
 

@@ -60,12 +60,12 @@ const API = {
         return StockGuardMockDB.handle(endpoint, options.method || 'GET', options.body ? JSON.parse(options.body) : null);
       }
 
-      // Handle 401 Unauthorized or 403 Forbidden (Session expired / invalid token)
-      if ((response.status === 401 || response.status === 403) && !endpoint.startsWith('/auth/')) {
+      // Handle 401 Unauthorized (Session expired / invalid token)
+      if (response.status === 401 && !endpoint.startsWith('/auth/')) {
         this.setToken(null);
         localStorage.removeItem('stockguard_user');
         window.location.href = '/app.html?view=login';
-        throw new Error('Session expired or access denied. Please log in again.');
+        throw new Error('Session expired. Please log in again.');
       }
 
       // Handle No Content

@@ -15,11 +15,16 @@ public class SettingController {
     private final AuthService authService;
     private final ShopRepository shopRepository;
     private final javax.sql.DataSource dataSource;
+    private final com.stockguard.service.AuditService auditService;
 
-    public SettingController(AuthService authService, ShopRepository shopRepository, javax.sql.DataSource dataSource) {
+    public SettingController(AuthService authService,
+                             ShopRepository shopRepository,
+                             javax.sql.DataSource dataSource,
+                             com.stockguard.service.AuditService auditService) {
         this.authService = authService;
         this.shopRepository = shopRepository;
         this.dataSource = dataSource;
+        this.auditService = auditService;
     }
 
     @GetMapping("/db-status")
@@ -28,13 +33,8 @@ public class SettingController {
         try (java.sql.Connection conn = dataSource.getConnection()) {
             java.sql.DatabaseMetaData meta = conn.getMetaData();
             String prodName = meta.getDatabaseProductName();
-            String prodVersion = meta.getDatabaseProductVersion();
+            boolean isH2 = prodName != null && prodName.toLowerCase().contains("h2");
             status.put("connected", true);
-            status.put("databaseProduct", prodName);
-            status.put("databaseVersion", prodVersion);
-            status.put("databaseUrl", meta.getURL());
-            status.put("shopsCount", shopRepository.count());
-            boolean isH2 = prodName.toLowerCase().contains("h2");
             status.put("isH2", isH2);
             status.put("engineName", isH2 ? "Local File Database (stockguard_data.mv.db)" : "MySQL 8.0 Database");
             status.put("status", "HEALTHY");
@@ -44,19 +44,22 @@ public class SettingController {
         } catch (Exception e) {
             status.put("connected", false);
             status.put("status", "ERROR");
-            status.put("message", e.getMessage());
+            status.put("message", "Database connection currently unavailable");
         }
         return ResponseEntity.ok(status);
     }
 
     @GetMapping("/shop")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('SHOP_OWNER', 'OWNER', 'MANAGER')")
     public ResponseEntity<Shop> getShopSettings() {
         return ResponseEntity.ok(authService.getCurrentUserShop());
     }
 
     @PutMapping("/shop")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('SHOP_OWNER', 'OWNER')")
     public ResponseEntity<Shop> updateShopSettings(@RequestBody Map<String, Object> payload) {
         Shop shop = authService.getCurrentUserShop();
+        var user = authService.getCurrentAuthenticatedUser();
 
         if (payload.containsKey("name")) shop.setName(payload.get("name").toString());
         if (payload.containsKey("ownerName")) shop.setOwnerName(payload.get("ownerName").toString());
@@ -72,6 +75,9 @@ public class SettingController {
         }
 
         Shop updated = shopRepository.save(shop);
+        auditService.logEvent(shop.getId(), user.getId(), user.getEmail(),
+                "SETTINGS_UPDATED", "SHOP", shop.getId().toString(),
+                "Updated shop settings for " + shop.getName(), null, "SUCCESS");
         return ResponseEntity.ok(updated);
     }
 }
